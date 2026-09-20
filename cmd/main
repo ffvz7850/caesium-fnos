@@ -1,0 +1,117 @@
+#!/bin/bash
+# Caesium web server lifecycle script for fnOS (micro_app gateway mode)
+# 监听 ${TRIM_APPDEST}/app.sock，由飞牛统一网关转发 /app/caesium/ 请求
+SERVER="${TRIM_APPDEST}/server.py"
+PID_FILE="${TRIM_PKGVAR}/server.pid"
+LOG_FILE="${TRIM_PKGVAR}/server.log"
+SOCK="${TRIM_APPDEST}/app.sock"
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}" 2>/dev/null
+}
+
+check_process() {
+    local pid=$1
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+find_python() {
+    for p in "${CAESIUM_PYTHON}" "/var/apps/python312/target/bin/python3" "/usr/local/bin/python3" "/usr/bin/python3" "python3"; do
+        if [ -n "$p" ] && command -v "$p" >/dev/null 2>&1; then
+            command -v "$p"
+            return 0
+        fi
+    done
+    return 1
+}
+
+case $1 in
+start)
+    # 已在运行则直接返回成功
+    if [ -f "$PID_FILE" ]; then
+        pid=$(head -n 1 "$PID_FILE" | tr -d '[:space:]')
+        if check_process "$pid"; then
+            exit 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+    # 数据目录必须可写
+    mkdir -p "${TRIM_PKGVAR}" 2>/dev/null
+    if [ ! -d "${TRIM_PKGVAR}" ] || [ ! -w "${TRIM_PKGVAR}" ]; then
+        echo "Caesium data dir not writable: ${TRIM_PKGVAR}" > "${TRIM_TEMP_LOGFILE}"
+        exit 1
+    fi
+    # 定位 python3
+    PYTHON=$(find_python)
+    if [ -z "$PYTHON" ]; then
+        echo "Caesium server failed: python3 not found" > "${TRIM_TEMP_LOGFILE}"
+        exit 1
+    fi
+    # 清理旧 socket
+    [ -S "$SOCK" ] && rm -f "$SOCK"
+    log_msg "Starting server.py with ${PYTHON} socket=${SOCK} appdest=${TRIM_APPDEST} var=${TRIM_PKGVAR}"
+    nohup "$PYTHON" "$SERVER" --socket "$SOCK" --workdir "${TRIM_PKGVAR}" >>"$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    # 等待 socket 就绪（最长 10 秒）
+    i=0
+    while [ "$i" -lt 20 ]; do
+        if [ -S "$SOCK" ]; then
+            log_msg "Started PID=$(head -n 1 "$PID_FILE" | tr -d '[:space:]') socket=$SOCK"
+            exit 0
+        fi
+        sleep 0.5
+        i=$((i + 1))
+    done
+    # 启动失败：把真实日志尾部展示给用户
+    log_msg "Process exited immediately, dumping log tail"
+    tail -n 20 "$LOG_FILE" 2>/dev/null > "${TRIM_TEMP_LOGFILE}"
+    if [ ! -s "${TRIM_TEMP_LOGFILE}" ]; then
+        echo "Caesium server failed to start. Check python3 availability: ${PYTHON}" > "${TRIM_TEMP_LOGFILE}"
+    fi
+    rm -f "$PID_FILE"
+    exit 1
+    ;;
+stop)
+    if [ -f "$PID_FILE" ]; then
+        pid=$(head -n 1 "$PID_FILE" | tr -d '[:space:]')
+        if [ -n "$pid" ]; then
+            kill -TERM "$pid" 2>/dev/null
+        fi
+        rm -f "$PID_FILE"
+    fi
+    pkill -f "${SERVER}" 2>/dev/null
+    [ -S "$SOCK" ] && rm -f "$SOCK"
+    exit 0
+    ;;
+status)
+    if [ -f "$PID_FILE" ]; then
+        pid=$(head -n 1 "$PID_FILE" | tr -d '[:space:]')
+        if check_process "$pid"; then
+            exit 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+    exit 3
+    ;;
+restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
+log)
+    local lines="${2:-100}"
+    if [ -f "$LOG_FILE" ]; then
+        tail -n "$lines" "$LOG_FILE"
+    else
+        echo "log file not exists: $LOG_FILE"
+        exit 1
+    fi
+    ;;
+*)
+    echo "Usage: $0 {start|stop|status|restart|log}"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,8 @@
+#!/bin/bash
+# Caesium uninstall pre-hook
+if [ -f "${TRIM_PKGVAR}/server.pid" ]; then
+    pid=$(head -n 1 "${TRIM_PKGVAR}/server.pid" | tr -d '[:space:]')
+    [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
+fi
+pkill -f "${TRIM_APPDEST}/server.py" 2>/dev/null
+exit 0

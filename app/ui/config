@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "caesium.main": {
+      "title": "Caesium",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "protocol": "",
+      "gatewayPrefix": "/app/caesium",
+      "gatewaySocket": "app.sock",
+      "url": "/app/caesium/",
+      "allUsers": true
+    }
+  }
+}
