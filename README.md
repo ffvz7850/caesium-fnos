@@ -122,6 +122,8 @@ caesium/
 
 > **引擎二进制说明**：本仓库不包含 `caesiumclt` 引擎二进制（约 6 MB，双架构）。编译好的引擎随 FPK 安装包在 Releases 分发；如需自行编译，请基于 [caesium-image-compressor](https://github.com/Lymphatus/caesium-image-compressor) 交叉编译 Linux x86_64 / aarch64 版本（含 `--format`、`--keep-dates`、`--tiff-algorithm` 等扩展参数），放入 `app/` 目录即可。
 
+> **SDK 说明**：`app/www/trimjs-web-app.js` 为飞牛官方授权 SDK（npm 包 `@trimjs/web-app`），按飞牛官方许可分发，随 FPK 安装包内置。自行构建时从 npm 获取（`npm pack @trimjs/web-app`）并复制到 `app/www/` 即可。
+
 ### 启动（TCP 模式，便于调试）
 ```bash
 python3 app/server.py --port 8390 --workdir ./var
