@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Caesium for fnOS — 一比一复刻原版界面的图片压缩工具（v1.7.0）
+Caesium for fnOS — 一比一复刻原版界面的图片压缩工具（v1.6.0）
 左侧文件列表(名称/分辨率/大小/已节省/状态) + 右侧三标签(压缩选项/图片尺寸/输出)
 压缩选项：JPEG质量 / PNG优化级别 / WebP质量 / TIFF压缩算法，JPEG色度二次采样+渐进式，PNG Zopfli
 """
@@ -1344,7 +1344,7 @@ loadQueue();
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "CaesiumWeb/1.7.0"
+    server_version = "CaesiumWeb/1.6.8"
 
     def log_message(self, *args):
         pass
