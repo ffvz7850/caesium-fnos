@@ -1,0 +1,3 @@
+#!/bin/bash
+# Caesium install pre-hook
+exit 0

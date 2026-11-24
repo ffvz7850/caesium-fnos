@@ -1,0 +1,14 @@
+appname               = caesium
+version               = 1.8.1
+display_name          = Caesium
+desc                  = 基于 Caesium 引擎的图片压缩工具，支持 JPG/PNG/WebP/GIF；多线程并行压缩（自动用满 CPU，可调 1~16 路），大批量图片显著提速；支持断点续传（中断后接着压、已完成不重压）、跳过已存在文件、异步扫描可取消、列表分页（每页 5000）、GIF 直通复制；修复并发落盘竞态、取消可中断在途引擎、全局进程预算防 OOM
+platform              = arm
+source                = thirdparty
+maintainer            = Caesium Community
+distributor           = ffvz
+micro_app             = true
+os_min_version        = 1.2.0401
+desktop_uidir         = ui
+desktop_applaunchname = caesium.main
+ctl_stop              = true
+install_type          = root

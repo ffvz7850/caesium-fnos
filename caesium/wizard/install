@@ -1,0 +1,11 @@
+[
+    {
+        "stepTitle": "Caesium 设置",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "Caesium 是一款图片压缩工具（JPG / PNG / WebP / GIF）。安装完成后，桌面会出现 Caesium 图标，点击即可打开网页版压缩界面，支持批量上传、质量/尺寸调整和 ZIP 打包下载。"
+            }
+        ]
+    }
+]

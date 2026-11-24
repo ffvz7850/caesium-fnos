@@ -1,0 +1,7 @@
+#!/bin/bash
+# Caesium install post-hook
+mkdir -p "${TRIM_PKGVAR}"
+chmod 755 "${TRIM_APPDEST}/caesiumclt" 2>/dev/null || true
+chmod 755 "${TRIM_APPDEST}/server.py" 2>/dev/null || true
+chmod +x "$(dirname "$0")"/* 2>/dev/null || true
+exit 0
