@@ -1,0 +1,26 @@
+Caesium PC 1.9.1 —— 单文件免安装版（安全修复版）
+================================================
+
+用法：双击 CaesiumPC.exe。电脑上无需安装 Python 或任何软件。
+
+  * 一个 exe 内嵌：Python 运行时 + 压缩引擎(caesium.dll) + 网页界面 + 作者官方图标。
+  * 打开后是软件自己的原生窗口（不启动外部浏览器进程）。
+  * 只监听 127.0.0.1，并新增一次性 token / Host / Origin 校验，网页无法跨站调用本机 API。
+  * 首次启动会把引擎释放到 %LOCALAPPDATA%\CaesiumPC\runtime（正常现象）。
+  * 文件列表 / 压缩记录 / 设置存在 %LOCALAPPDATA%\CaesiumPC。
+  * 每次启动生成随机 token；升级时会按 server.py 与界面文件的内容签名重新释放资源。
+
+相对 1.9.0 的修复：
+  * 修复恶意网页可经 /api/open 执行本机程序的严重安全问题；
+  * 升级后不再误用旧版 server.py / 旧界面；
+  * 修复 results.json 并发落盘竞态，避免重启后重复压缩；
+  * 任务 single-flight，避免多任务互相抢活跃状态；
+  * 队列引用提交增加 expect_count 校验，防止半份队列静默漏压；
+  * workers=0 正确回退 CAESIUM_WORKERS；
+  * 修复 WebP VP8X 尺寸少 1，补上 VP8L 尺寸解析；
+  * 万级文件不再每文件全盘扫输出目录，轮询改为增量回传；
+  * 目标大小 / 缩放数值纳入设置持久化；
+  * 默认监听地址改为 127.0.0.1，版本信息统一为 1.9.1。
+
+引擎版本：官方 Caesium Image Compressor 2.8.5 的 caesium.dll（未修改）。
+作者：Lymphatus / Caesium Image Compressor（GPL-3.0，见 LICENSE）。

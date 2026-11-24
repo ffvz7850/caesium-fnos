@@ -1,152 +1,154 @@
-# Caesium for fnOS
+# Caesium PC 1.9.1（单文件版）源代码包
 
-**飞牛 fnOS（飞牛私有云 NAS）上的原生图片压缩工具** —— 网页版 Caesium Image Compressor
+本包是 **Caesium PC 1.9.1 单文件版**的完整可读源代码与构建材料，基于官方 1.9.0 单文件版
+（PyInstaller onefile，Python 3.13 + pywebview/pythonnet）做**定向修复**后产出。
 
-在 NAS 本机完成图片压缩，界面一比一复刻 Caesium 桌面版：左侧文件列表（名称 / 分辨率 / 大小 / 已节省 / 状态），右侧三标签（压缩选项 / 图片尺寸 / 输出），底部原图与压缩后对比预览。
-
-当前版本：**v1.7.0**（micro_app 网关模式，原生目录授权）
-
----
-
-## 功能特性
-
-### 压缩能力
-- 支持格式：**JPG / PNG / WebP / GIF / TIFF / BMP / AVIF**
-- 三种模式：
-  - **图片质量**：按最终输出格式独立设置质量（JPEG 质量 / PNG 质量+优化级别 / WebP 质量 / TIFF 压缩算法）
-  - **无损压缩**：PNG / WebP 等无损优化
-  - **目标大小**：压缩到指定 KB 以内（尽力而为）
-- JPEG 高级：色度二次采样（4:4:4 / 4:2:2 / 4:2:0 / 4:1:1）、渐进式 JPEG
-- PNG 高级：优化级别（0–6）、Zopfli 深度优化
-- 保留 EXIF 元数据开关
-
-### 图片尺寸
-- 不调整 / 最长边 / 指定宽度 / 指定高度 / 按百分比
-- 等比缩放，保持原始宽高比；「不放大图片」保护小图
-
-### 输出
-- 选择输出目录（飞牛系统原生目录选择 + 授权，只显示已授权文件夹）
-- 保留目录结构
-- 导出格式：保持原格式 / JPEG / PNG / WebP / TIFF
-- 保留文件时间
-- 覆盖策略：输出到原文件夹时提示风险
-
-### 使用体验
-- 文件列表自动持久化（关闭页面不丢失，可恢复上次添加的文件）
-- 压缩过程中锁定设置、文件列表保持可操作
-- 「再压缩失败」：一键只重试失败项
-- 原图 / 压缩后对比预览
-- 压缩任务日志
-
-### 授权与安全
-- 基于飞牛官方 **micro_app 网关模式** + 官方授权 SDK（`@trimjs/web-app`）
-- 添加文件夹 / 添加文件 / 选择输出目录均调用**系统原生授权选择器**，只显示已授权目录
-- 应用只访问你在飞牛中授权的目录，文件全程在 NAS 本机处理，不上传任何第三方服务
-- 卸载时可选择保留或彻底删除应用数据
+- 产品形态：单个 `CaesiumPC.exe`，双击启动，内置本地 HTTP 服务 + WebView2 原生窗口
+- 修复来源：`PC-1.9.0-全面代码审查报告.md`（P0/P1 全部处理，P2 处理主要项）
+- 引擎：官方 `caesium.dll`（未修改），本包 `app/caesium.dll` 与 1.9.0 发布包内文件一致
 
 ---
 
-## 安装
+## 1. 目录结构
 
-### 环境要求
-- 飞牛 fnOS **1.2.0401 或更高**（micro_app 网关特性要求）
-- 选择与 NAS CPU 架构匹配的安装包：`x86_64`（Intel/AMD）或 `arm64`（ARM）
+```
+caesium-pc-1.9.1/
+├─ README.md                 本文件
+├─ launcher_native.py        原生窗口启动器源码（对应 PyInstaller 内 launcher_native）
+├─ build_exe.py              二进制补丁式重打包脚本（只替换 2 个条目）
+├─ test_fixed_server.py      后端回归测试（16 项，隔离临时目录）
+└─ app/
+   ├─ server.py              后端 + 内嵌前端（单文件，约 3790 行）
+   ├─ caesium.dll            官方压缩引擎（未修改，供重打包使用）
+   └─ ui/
+      ├─ config              飞牛版遗留配置（PC 版不读取，保留以对齐原包结构）
+      └─ images/             icon_64.png / icon_256.png
+```
 
-### 安装步骤
-1. 从 Releases 下载最新 `.fpk` 安装包
-2. 进入飞牛 fnOS「应用中心 → 手动安装」，选择 FPK 文件
-3. 安装完成后，从 fnOS 桌面打开 **Caesium**
-4. 首次使用点击「添加文件夹」或顶部授权横幅，在弹出的系统窗口中选择要授权的目录即可
+`app/server.py` 结构：
 
-### 命令行安装（可选）
-```bash
-appcenter-cli stop caesium || true
-appcenter-cli uninstall caesium || true
-appcenter-cli install-fpk /tmp/caesium_1.7.0_x86_64.fpk
-appcenter-cli start caesium
+| 行段 | 内容 |
+|---|---|
+| 1–1823 | Python 后端：图像尺寸解析、结果持久化、任务与引擎、落盘、队列、扫描、HTTP 工具 |
+| 1824–3361 | 内嵌 `PAGE` 字符串（HTML/CSS/JS 前端） |
+| 3362–末尾 | `Handler` 全部路由（`/api/*`）+ `main()` |
+
+---
+
+## 2. 运行与数据目录
+
+- 系统：Windows 10 1809+ / Windows 11，需 **WebView2 Runtime**（Win11 自带，Win10 需安装）
+- 启动流程（`launcher_native.py`）：
+  1. 取得单实例锁 `%LOCALAPPDATA%\CaesiumPC\instance.json`
+  2. 生成一次性随机 token 写到 `%LOCALAPPDATA%\CaesiumPC\token`（仅当前用户可读）
+  3. 按内容签名比对，把 `_MEIPASS/app` 释放/更新到 `%LOCALAPPDATA%\CaesiumPC\runtime\app`
+  4. 以 `--host 127.0.0.1 --token ...` 起后端线程，`wait_ready` 后开 WebView2 窗口
+  5. 关窗即退出进程（服务线程为 daemon）
+- 用户数据全部在 `%LOCALAPPDATA%\CaesiumPC`：`results.json`、`queue.json`、`folders.json`、
+  `excluded.json`、`preview/`、日志 `launcher.log`；删除该目录即可完全重置（会丢断点续传记录）
+
+---
+
+## 3. 重新打包
+
+本包**不包含**原 1.9.0 exe（体积 16 MB，请使用你手上的官方发布包）。
+`build_exe.py` 采用「只替换 CArchive 中两个条目」的方式，其余依赖字节原样保留：
+
+```bat
+python build_exe.py --orig-exe "D:\path\to\CaesiumPC-1.9.0-single\CaesiumPC.exe"
+:: 产物：dist\CaesiumPC.exe
+```
+
+可选参数：`--server`、`--launcher`、`--out`。
+
+产物自检（解包核对内嵌代码与工作副本一致）可参考 1.9.1 的审查流程：读取 exe 末尾
+`MEI\x0c\x0b\x0a\x0b\x0e` cookie，解析 TOC，取出 `app\server.py` 比对 sha256。
+
+---
+
+## 4. 回归测试
+
+```bat
+python test_fixed_server.py
+```
+
+覆盖：无 token / 错 token / 坏 Host / 坏 Origin / `text/plain` 拒绝、页面 token 注入、
+`/api/open` 拒绝文件与非白名单目录、`workers=0` 回退环境变量、VP8X `+1` 与 VP8L 解码、
+16 线程 3200 条记录并发落盘、`use_queue` 数量不匹配 409、任务 single-flight 409。
+当前结果：**16/16 通过**。
+
+---
+
+## 5. 1.9.1 修复清单
+
+### P0 安全（阻断项）
+
+1. **跨站请求可执行任意程序**
+   - 原状：`/api/open` 把请求路径直接交给 `os.startfile()`，且后端不校验 `Origin`/`Host`/`Content-Type`；
+     恶意网页可用 `text/plain` 简单请求（不触发预检）静默执行本机 `.exe/.cmd`。
+   - 修复：
+     - 全 API 要求 `X-Caesium-Token`，token 由启动器每次启动随机生成并注入页面；
+     - 所有请求校验 `Host` ∈ {127.0.0.1, localhost}；有 `Origin` 时必须同源；
+     - POST/PUT 强制 `Content-Type: application/json`，否则 415；
+     - `/api/open` 拒绝非目录，且只允许打开已浏览/已保存目录或任务输出目录；
+     - 默认监听地址由 `0.0.0.0` 改为 `127.0.0.1`。
+2. **任意路径读取**：`/api/img`、`/api/fs/list` 增加授权根校验（盘符/已保存目录/任务输出）。
+
+### P1 功能与数据
+
+3. **升级不生效**：资源签名由「仅 dll mtime+size」改为 `server.py` + `caesium.dll` + `ui/` 内容哈希，
+   新版不再复用旧 runtime。
+4. **服务冒名 / 多实例**：`instance.json` 记录 pid、exe 路径、版本；复用前校验 token、进程存活、
+   版本一致；重复启动弹窗提示，不再静默共用后端。
+5. **`results.json` 落盘竞态**：`FLUSH_LOCK` + generation 防陈旧快照 + uuid 临时文件 + `fsync` +
+   失败保留脏标记。
+6. **任务/队列可被污染**：压缩任务 single-flight（已有运行任务返回 409）；队列读写加锁；
+   `use_queue` 提交带 `expect_count`，与实际条数不符返回 409，前端自动回退逐条提交。
+7. **取消语义**：取消后在途文件不再计入完成数，未开始条目回填，计数闭合。
+
+### P2 性能与正确性
+
+8. `workers=0`/`"0"` 正确回退 `CAESIUM_WORKERS` 环境变量。
+9. 临时目录清理由「每文件一次 listdir」改为「每任务一次」，消除万级文件 O(n²) 扫描（原 1 万文件约多花 77 秒）。
+10. 任务轮询改增量（`since` 游标），不再每 1.2 秒回传全量 results。
+11. VP8X 尺寸补 `+1`，新增 VP8L 分支；`targetSize` / `resizeVal` 加入设置持久化。
+12. 拖动质量滑块不再整页 `render()`（防抖 + 仅更新当前页）。
+13. 版本号统一 `1.9.1`；`/api/status` 增加 pid/version/engine 字段；启动器崩溃时弹窗并写日志。
+14. `do_GET` 增加异常兜底；错误响应不再回显完整异常文本。
+
+---
+
+## 6. 验证记录
+
+| 项目 | 结果 |
+|---|---|
+| `python -m py_compile app/server.py launcher_native.py` | 通过 |
+| 内嵌 JS `node --check` | 通过 |
+| `test_fixed_server.py` | 16/16 通过 |
+| 新 exe `--diag` | 正常输出环境诊断 |
+| 新 exe `--no-window` 端到端 | `/api/status` 返回 `version=1.9.1 / engine=dll`；无 token 403、错 token 403、`text/plain` 415、坏 Host/Origin 403 |
+| 内嵌代码一致性 | 解包所得 `app/server.py` 与源码 sha256 一致 |
+
+发布产物 sha256（1.9.1）：
+
+```
+CaesiumPC.exe                  c4190f04d42263ef0a2a6ee477d694aabbb64db441d3c46c3c3d5c6e67127e1a
+CaesiumPC-1.9.1-single-win64.zip  c3c8859942da8cce96d03662af2658ddd3b221527c8552be9dd62b5eb9e98dcc
 ```
 
 ---
 
-## 使用说明
+## 7. 已知限制
 
-1. 点击「添加文件夹」→ 系统原生窗口选择 NAS 中的图片目录（自动授权并扫描图片）
-2. 或在「压缩选项 / 图片尺寸 / 输出」中按需调整参数
-3. 选择输出目录（默认可勾选「保留目录结构」）
-4. 点击「压缩」，底部状态栏显示进度；压缩完成后文件列表显示节省百分比
-5. 有失败项时，可点击「再压缩失败」仅重试失败文件
+- 未做真机 GUI 人工点击验收（自动化只覆盖 `--diag` 与 `--no-window` 端到端）。
+- token 以明文存于 `%LOCALAPPDATA%\CaesiumPC\token`，依赖 Windows 用户目录 ACL；同用户下的
+  恶意程序仍可读取——本地单用户应用的合理边界，未做 DPAPI 加密。
+- 端口 43117 被占用时会顺延（43118–43156 或随机），此时浏览器 origin 改变，localStorage 中的
+  前端设置读不到（服务端 `queue.json`/`results.json` 不受影响）。
+- 关闭窗口会立即中断进行中的压缩；已落盘输出采用「临时目录 + `os.replace`」原子替换，不会产生半文件，
+  未完成任务下次启动可续传。
+- DLL 压缩调用无法被真正中断，取消在「当前文件完成」后生效。
 
----
+## 8. 许可
 
-## 技术架构
-
-| 层级 | 技术 |
-|------|------|
-| 应用封装 | 飞牛 fnOS FPK、micro_app 网关模式（unix socket）、生命周期脚本 |
-| 后端服务 | Python 3 标准库 HTTP 服务（单文件 `server.py`，含全部前端） |
-| 压缩引擎 | caesiumclt（Rust，基于 [caesium-image-compressor](https://github.com/Lymphatus/caesium-image-compressor)） |
-| 授权桥接 | 飞牛官方 SDK `@trimjs/web-app`（随包分发，原生目录选择） |
-| 前端界面 | 原生 HTML / CSS / JavaScript（内嵌于 server.py） |
-
-### 关键设计
-- **micro_app 网关模式**：应用监听 `app.sock`（unix socket），由飞牛统一网关转发 `/app/caesium/` 请求；该模式是官方授权 SDK 正常工作的前提
-- **授权目录**：通过 `TRIM_DATA_ACCESSIBLE_PATHS` 环境变量 + 历史记录管理可访问目录，只展示已授权路径
-- **打包双架构**：manifest `platform=x86` / `platform=arm` 分别产出 `x86_64` / `arm64` 安装包
-
----
-
-## 目录结构
-
-```
-caesium/
-├── manifest              # FPK 应用清单（micro_app、版本、权限）
-├── app/
-│   ├── server.py         # 后端服务 + 全部前端（单文件）
-│   ├── caesiumclt        # 压缩引擎二进制（Linux x86_64 / aarch64）
-│   ├── ui/
-│   │   ├── config        # 桌面入口配置（网关模式）
-│   │   └── images/       # 应用图标
-│   └── www/
-│       └── trimjs-web-app.js   # 飞牛官方授权 SDK（@trimjs/web-app）
-├── cmd/                  # 生命周期脚本（start / stop / status / log）
-├── config/
-│   ├── privilege         # 运行权限（package 用户）
-│   └── resource          # api-scope：宿主 API 权限声明
-├── wizard/               # 安装 / 卸载向导
-└── ICON.PNG / ICON_256.PNG
-```
-
----
-
-## 本地开发与测试
-
-> **引擎二进制说明**：本仓库不包含 `caesiumclt` 引擎二进制（约 6 MB，双架构）。编译好的引擎随 FPK 安装包在 Releases 分发；如需自行编译，请基于 [caesium-image-compressor](https://github.com/Lymphatus/caesium-image-compressor) 交叉编译 Linux x86_64 / aarch64 版本（含 `--format`、`--keep-dates`、`--tiff-algorithm` 等扩展参数），放入 `app/` 目录即可。
-
-> **SDK 说明**：`app/www/trimjs-web-app.js` 为飞牛官方授权 SDK（npm 包 `@trimjs/web-app`），按飞牛官方许可分发，随 FPK 安装包内置。自行构建时从 npm 获取（`npm pack @trimjs/web-app`）并复制到 `app/www/` 即可。
-
-### 启动（TCP 模式，便于调试）
-```bash
-python3 app/server.py --port 8390 --workdir ./var
-```
-
-### 测试
-- `_test/mock_clt.c`：mock 压缩引擎（winlibs gcc 编译为 caesiumclt.exe）
-- `_test/e2e_test170.py`：E2E 回归（API + 网关前缀路由）
-- `_test/verify_fpk_170.py`：FPK 解包校验（manifest / 引擎架构 / SDK）
-
-### 打包
-```bash
-fnpack build --directory caesium
-```
-- `platform=x86` + x86_64 引擎 → `caesium_<版本>_x86_64.fpk`
-- `platform=arm` + aarch64 引擎 → `caesium_<版本>_arm64.fpk`
-
----
-
-## 许可证
-
-- 本项目代码：**Apache License 2.0**（见 [LICENSE](LICENSE)）
-- 压缩引擎基于 [caesium-image-compressor](https://github.com/Lymphatus/caesium-image-compressor) 构建
-- 飞牛官方授权 SDK（`@trimjs/web-app`）按飞牛官方许可分发
-
-本项目为第三方开源项目，与飞牛官方无隶属关系。
+见发布包内 `LICENSE`（Apache-2.0）。`caesium.dll` 为 Caesium 官方引擎，版权归其作者所有，未做修改。
